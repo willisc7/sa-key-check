@@ -1,5 +1,11 @@
+Service Account needs `Cloud Asset Viewer` permissions at the org level
+
 ```
-gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com logging.googleapis.com cloudasset.googleapis.com
+gcloud services enable artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  run.googleapis.com \
+  logging.googleapis.com \
+  cloudasset.googleapis.com
 ```
 
 ```
