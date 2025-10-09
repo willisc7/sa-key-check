@@ -6,7 +6,7 @@ def sa_key_check(request):
     scope = f"organizations/{GCP_ORGANIZATION_ID}"
 
     # Look for keys expiring in the next 30 days.
-    EXPIRATION_WINDOW_DAYS = 1000
+    EXPIRATION_WINDOW_DAYS = 30
     expiration_window_seconds = timedelta(days=EXPIRATION_WINDOW_DAYS).total_seconds()
 
     client = asset_v1.AssetServiceClient()
