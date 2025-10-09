@@ -1,12 +1,13 @@
 from google.cloud import asset_v1
-import datetime
+from datetime import datetime, timezone, timedelta
 
 def sa_key_check(request):
     GCP_ORGANIZATION_ID = "206587515385"
     scope = f"organizations/{GCP_ORGANIZATION_ID}"
 
-    # SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60
-    SECONDS_IN_A_YEAR = 30 * 24 * 60 * 60
+    # Look for keys expiring in the next 30 days.
+    EXPIRATION_WINDOW_DAYS = 1000
+    expiration_window_seconds = timedelta(days=EXPIRATION_WINDOW_DAYS).total_seconds()
 
     client = asset_v1.AssetServiceClient()
     service_account_key_asset_type = "iam.googleapis.com/ServiceAccountKey"
@@ -19,16 +20,28 @@ def sa_key_check(request):
         }
     )
 
-    for key in key_response:
-        key_version = key.versioned_resources.pop()
+    expiring_keys = []
+    now = datetime.now(timezone.utc)
 
-        validBeforeTime = key_version.resource.get('validBeforeTime', 'N/A')
-        if validBeforeTime == 'N/A':
-            # This is a non-expiring key, so we can skip it.
+    for key in key_response:
+        if not key.versioned_resources:
             continue
 
-        seconds_until_expiry = int((datetime.datetime.fromisoformat(validBeforeTime.replace('Z', '+00:00'))- datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+        key_version = key.versioned_resources[0]
 
-        # Only print keys that expire in the next year and have not already expired.
-        if 0 < seconds_until_expiry <= SECONDS_IN_A_YEAR:
-            print(f"{key.parent_full_resource_name.split('/')[-1]},{key.name},{seconds_until_expiry}")
+        valid_before_time = key_version.resource.get('validBeforeTime')
+        # Non-expiring keys have a far-future expiry date or no expiry.
+        if not valid_before_time or valid_before_time == "9999-12-31T23:59:59Z":
+            continue
+
+        expiry_date = datetime.fromisoformat(valid_before_time.replace('Z', '+00:00'))
+        seconds_until_expiry = (expiry_date - now).total_seconds()
+
+        # Only include keys that expire within our window and have not already expired.
+        if 0 < seconds_until_expiry <= expiration_window_seconds:
+            key_info = f"Service Account: {key.parent_full_resource_name.split('/')[-1]}, Key: {key.name}, Expires in (seconds): {int(seconds_until_expiry)}"
+            expiring_keys.append(key_info)
+
+    result_string = f"Found {len(expiring_keys)} expiring keys: " + "; ".join(expiring_keys)
+    print(result_string)
+    return "Function executed successfully."
