@@ -1,5 +1,6 @@
 from google.cloud import asset_v1
 from datetime import datetime, timezone, timedelta
+import json
 
 def sa_key_check(request):
     GCP_ORGANIZATION_ID = "206587515385"
@@ -39,9 +40,23 @@ def sa_key_check(request):
 
         # Only include keys that expire within our window and have not already expired.
         if 0 < seconds_until_expiry <= expiration_window_seconds:
-            key_info = f"Service Account: {key.parent_full_resource_name.split('/')[-1]}, Key: {key.name}, Expires in (seconds): {int(seconds_until_expiry)}"
+            key_info = f"Service Account: {key.parent_full_resource_name.split('/')[-1]}"
             expiring_keys.append(key_info)
 
-    result_string = f"Found {len(expiring_keys)} expiring keys: " + "; ".join(expiring_keys)
-    print(result_string)
+    if expiring_keys:
+        # Format the message with newlines for readability in Cloud Logging.
+        message = "Found service account keys expiring in the next 30 days:\n" + "\n".join(expiring_keys)
+        
+        # Create a structured log entry as a dictionary.
+        log_entry = {
+            "severity": "WARNING", # Or "INFO", "ERROR", etc.
+            "message": message,
+            "component": "sa-key-check",
+            "expiring_key_count": len(expiring_keys),
+        }
+        # Print the dictionary as a JSON string.
+        print(json.dumps(log_entry))
+    else:
+        print("No service account keys found expiring in the next 30 days.")
+
     return "Function executed successfully."
